@@ -5,7 +5,7 @@
 
 #define STR_BUF_SZ 256
 
-//convinience conatiner for input arguments
+//Item holds argument and value
 typedef struct Item {
     char* name;
     char* value; 
@@ -13,7 +13,7 @@ typedef struct Item {
 } Item;
 
 //Item* constructor
-Item* parc_item_alloc(){
+Item* _parc_item_alloc(){
     Item* v = (Item*)malloc(sizeof(Item));
 
     v->name = NULL;
@@ -24,15 +24,16 @@ Item* parc_item_alloc(){
 }
 
 //Item* destructor
-void parc_item_free(Item* it){
+void _parc_item_free(Item* it){
     free(it->name);
     free(it->value);
     free(it);
 }
 
-//splits string and fill name and value of Item*
-//if failed to split. string is copied into name
-void parc_item_parse(Item* it, const char* str, char sep){
+//splits string by 'sep' separator
+//sets it->name to first part and it->value to second
+//it->name contains fool string if nothing to split
+void _parc_item_parse(Item* it, const char* str, char sep){
     size_t sz = strlen(str);
 
     for (size_t i = 0; i < sz; i++){
@@ -68,11 +69,11 @@ void parc_item_parse(Item* it, const char* str, char sep){
 }
 
 //returns head of linked list of Item* elements
-Item* item_list_alloc(size_t sz){
-    Item* head = parc_item_alloc();
+Item* _parc_item_list_alloc(size_t sz){
+    Item* head = _parc_item_alloc();
 
     for (Item* it = head;sz != 0; sz--){
-        it->next = parc_item_alloc();
+        it->next = _parc_item_alloc();
         it = it->next;
     }
 
@@ -80,18 +81,18 @@ Item* item_list_alloc(size_t sz){
 }
 
 //item list destructor
-void item_list_free(Item* head){
+void parc_free(Item* head){
     Item* del;
     for (Item *it = head; it != NULL;){
         del = it;
 
         it = it->next;
 
-        parc_item_free(del);
+        _parc_item_free(del);
     }
 }
 
-Item* item_list_find(Item* head, const char* name){
+Item* _parc_item_list_find(Item* head, const char* name){
     for (Item* it = head; it != NULL; it = it->next){
         if (strncmp(it->name, name, STR_BUF_SZ) == 0){
             return it;
@@ -119,16 +120,29 @@ void parc_item_set(Item* it, const char* name, const char* value){
 }
 
 int parc_get_int(Item* head, const char* name){
-    return atoi(item_list_find(head, name)->value);
+    return atoi(_parc_item_list_find(head, name)->value);
+}
+
+double parc_get_double(Item* head, const char* name){
+    return atof(_parc_item_list_find(head, name)->value);
+}
+
+//user is responsible for returned memory
+char* parc_get_str(Item* head, const char* name){
+    Item* it = _parc_item_list_find(head, name);
+
+    char* str = (char*)malloc(strlen(it->value));
+    memcpy(str, it->value, strlen(it->value));
+    return str;
 }
 
 //parse arguments and put them in list
 Item* parc_parse(int argc, char **argv){
-    Item* head = item_list_alloc(argc - 1);
+    Item* head = _parc_item_list_alloc(argc - 1);
 
     Item* it = head;
     for (int i = 1; i < argc; i++){
-        parc_item_parse(it, argv[i], '=');
+        _parc_item_parse(it, argv[i], '=');
         it = it->next;
     }
 
