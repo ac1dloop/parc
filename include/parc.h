@@ -6,15 +6,15 @@
 #define STR_BUF_SZ 256
 
 //Item holds argument and value
-typedef struct Item {
+typedef struct ParcItem {
     char* name;
     char* value; 
-    struct Item *next;
-} Item;
+    struct ParcItem *next;
+} ParcItem;
 
 //Item* constructor
-Item* _parc_item_alloc(){
-    Item* v = (Item*)malloc(sizeof(Item));
+ParcItem* _parc_item_alloc(){
+    ParcItem* v = (ParcItem*)malloc(sizeof(ParcItem));
 
     v->name = NULL;
     v->value = NULL;
@@ -24,7 +24,7 @@ Item* _parc_item_alloc(){
 }
 
 //Item* destructor
-void _parc_item_free(Item* it){
+void _parc_item_free(ParcItem* it){
     free(it->name);
     free(it->value);
     free(it);
@@ -33,7 +33,7 @@ void _parc_item_free(Item* it){
 //splits string by 'sep' separator
 //sets it->name to first part and it->value to second
 //it->name contains fool string if nothing to split
-void _parc_item_parse(Item* it, const char* str, char sep){
+void _parc_item_parse(ParcItem* it, const char* str, char sep){
     size_t sz = strlen(str);
 
     for (size_t i = 0; i < sz; i++){
@@ -57,22 +57,18 @@ void _parc_item_parse(Item* it, const char* str, char sep){
         }
     }
 
-    free(it->value);
-    it->value = NULL;
-
-    if (it->name)
-        it->name = (char*)realloc(it->name, sizeof(char) * strlen(str));
-    else it->name = (char*)malloc(sizeof(char) * strlen(str));
+    it->name = (char*)malloc(sizeof(char) * strlen(str) + 1);
 
     memcpy(it->name, str, strlen(str));
-    it->name[strlen(str) - 1] = '\0';
+
+    it->name[strlen(str)] = '\0';
 }
 
 //returns head of linked list of Item* elements
-Item* _parc_item_list_alloc(size_t sz){
-    Item* head = _parc_item_alloc();
+ParcItem* _parc_item_list_alloc(size_t sz){
+    ParcItem* head = _parc_item_alloc();
 
-    for (Item* it = head;sz != 0; sz--){
+    for (ParcItem* it = head;sz != 0; sz--){
         it->next = _parc_item_alloc();
         it = it->next;
     }
@@ -81,9 +77,9 @@ Item* _parc_item_list_alloc(size_t sz){
 }
 
 //item list destructor
-void parc_free(Item* head){
-    Item* del;
-    for (Item *it = head; it != NULL;){
+void parc_free(ParcItem* head){
+    ParcItem* del;
+    for (ParcItem *it = head; it != NULL;){
         del = it;
 
         it = it->next;
@@ -92,8 +88,8 @@ void parc_free(Item* head){
     }
 }
 
-Item* _parc_item_list_find(Item* head, const char* name){
-    for (Item* it = head; it != NULL; it = it->next){
+ParcItem* _parc_item_list_find(ParcItem* head, const char* name){
+    for (ParcItem* it = head; it->next; it = it->next){
         if (strncmp(it->name, name, STR_BUF_SZ) == 0){
             return it;
         }
@@ -103,10 +99,10 @@ Item* _parc_item_list_find(Item* head, const char* name){
 }
 
 // #ifdef PARC_DBG
-void print_item_list(Item* head){
+void _parc_print_item_list(ParcItem* head){
     size_t count = 0;
 
-    for (Item* it = head; it != NULL; it = it->next){
+    for (ParcItem* it = head; it != NULL; it = it->next){
         printf("item: %zu\n", count++);
         printf("%s:%s\n", it->name, it->value);
     }
@@ -114,33 +110,78 @@ void print_item_list(Item* head){
 // #endif
 
 //assuming name and value are NULL-terminated 'strings'
-void parc_item_set(Item* it, const char* name, const char* value){
+void parc_item_set(ParcItem* it, const char* name, const char* value){
     memcpy(it->name, name, strlen(name));
     memcpy(it->value, value, strlen(value));
 }
 
-int parc_get_int(Item* head, const char* name){
+//this is tipa API
+ParcItem* parc_get_item(ParcItem* head, const char* name){
+    ParcItem* it = _parc_item_list_find(head, name);
+
+    return it;
+}
+
+int parc_get_int(ParcItem* head, const char* name){
     return atoi(_parc_item_list_find(head, name)->value);
 }
 
-double parc_get_double(Item* head, const char* name){
+double parc_get_double(ParcItem* head, const char* name){
     return atof(_parc_item_list_find(head, name)->value);
 }
 
 //user is responsible for returned memory
-char* parc_get_str(Item* head, const char* name){
-    Item* it = _parc_item_list_find(head, name);
+char* parc_get_str(ParcItem* head, const char* name){
+    ParcItem* it = _parc_item_list_find(head, name);
 
     char* str = (char*)malloc(strlen(it->value));
     memcpy(str, it->value, strlen(it->value));
     return str;
 }
 
-//parse arguments and put them in list
-Item* parc_parse(int argc, char **argv){
-    Item* head = _parc_item_list_alloc(argc - 1);
+int parc_int(ParcItem* head, const char* name, int default_value){
+    ParcItem* it = parc_get_item(head, name);
 
-    Item* it = head;
+    if (it != NULL)
+        return atoi(it->value);
+    
+    return default_value;
+}
+
+double parc_double(ParcItem* head, const char* name, double default_value){
+    ParcItem* it = parc_get_item(head, name);
+    if (it)
+        return atof(it->value);
+
+    return default_value;
+}
+
+char* parc_str(ParcItem* head, const char* name, const char* default_value){
+    ParcItem* it = parc_get_item(head, name);
+
+    if (it){
+        char* str = (char*)malloc(strlen(it->value));
+        memcpy(str, it->value, strlen(it->value));
+        return str;
+    }
+
+    char* str = (char*)malloc(strlen(default_value));
+    memcpy(str, default_value, strlen(default_value));
+    return str;
+}
+
+int parc_bool(ParcItem* head, const char* name){
+    if (parc_get_item(head, name) != NULL)
+        return 1;
+    
+    return 0;
+}
+
+//parse arguments and put them in list
+ParcItem* parc_parse(int argc, char **argv){
+    ParcItem* head = _parc_item_list_alloc(argc - 1);
+
+    ParcItem* it = head;
     for (int i = 1; i < argc; i++){
         _parc_item_parse(it, argv[i], '=');
         it = it->next;
